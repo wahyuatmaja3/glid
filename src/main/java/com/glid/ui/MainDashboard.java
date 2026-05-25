@@ -1,6 +1,7 @@
 package com.glid.ui;
 
 import com.glid.app.AppContext;
+import com.glid.model.DetectionFrame;
 import com.glid.model.Employee;
 import com.glid.model.RecognitionEvent;
 import javafx.collections.FXCollections;
@@ -12,11 +13,14 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -45,6 +49,12 @@ public class MainDashboard {
     private final DatePicker toDate = new DatePicker(LocalDate.now());
     private final TextField filterDepartmentField = new TextField();
     private final TextField filterEmployeeCodeField = new TextField();
+    private final TextField cameraIndexField = new TextField("0");
+    private final Label cameraStatusLabel = new Label("Camera idle");
+    private final Label detectionStatusLabel = new Label("Faces detected: 0");
+    private final Label evidenceStatusLabel = new Label("Evidence: none");
+    private final CheckBox autoAttendanceCheckBox = new CheckBox("Auto attendance");
+    private final ImageView cameraPreview = new ImageView();
 
     public MainDashboard(AppContext context) {
         this.context = context;
@@ -53,10 +63,9 @@ public class MainDashboard {
     public Parent build() {
         BorderPane root = new BorderPane();
         root.setPadding(new Insets(16));
+        autoAttendanceCheckBox.setSelected(context.autoAttendanceService().isAutoModeEnabled());
         root.setTop(buildHeader());
-        root.setLeft(buildRegistrationPanel());
-        root.setCenter(buildAttendancePanel());
-        root.setRight(buildReportPanel());
+        root.setCenter(buildMainTabs());
         refreshEmployees();
         refreshAttendance();
         refreshSummary();
@@ -68,21 +77,30 @@ public class MainDashboard {
         Label title = new Label("Glid Offline Face Recognition Attendance");
         title.setStyle("-fx-font-size: 22px; -fx-font-weight: bold;");
 
-        Label subtitle = new Label("MVP desktop dashboard with registration, simulated recognition, cooldown validation, attendance history, and report preview.");
+        Label subtitle = new Label("MVP desktop dashboard with dedicated tabs for registration, face scan monitoring, and attendance reporting.");
         subtitle.setWrapText(true);
 
-        Button simulateNormal = new Button("Simulate Normal Face");
-        simulateNormal.setOnAction(event -> handleRecognition(false));
+        HBox summary = new HBox(8, new Label("Summary:"), summaryLabel);
+        summary.setAlignment(Pos.CENTER_LEFT);
 
-        Button simulateMasked = new Button("Simulate Masked Face");
-        simulateMasked.setOnAction(event -> handleRecognition(true));
-
-        HBox actions = new HBox(10, simulateNormal, simulateMasked, summaryLabel);
-        actions.setAlignment(Pos.CENTER_LEFT);
-
-        VBox box = new VBox(8, title, subtitle, actions);
+        VBox box = new VBox(8, title, subtitle, summary);
         box.setPadding(new Insets(0, 0, 16, 0));
         return box;
+    }
+
+    private TabPane buildMainTabs() {
+        Tab registerTab = new Tab("Register", buildRegistrationPanel());
+        registerTab.setClosable(false);
+
+        Tab faceScanTab = new Tab("Scan Wajah", buildScanPanel());
+        faceScanTab.setClosable(false);
+
+        Tab reportTab = new Tab("Report", buildReportPanel());
+        reportTab.setClosable(false);
+
+        TabPane tabPane = new TabPane(registerTab, faceScanTab, reportTab);
+        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        return tabPane;
     }
 
     private VBox buildRegistrationPanel() {
@@ -114,18 +132,51 @@ public class MainDashboard {
                 new Label("Registered Employees"),
                 employeeTable
         );
-        panel.setPadding(new Insets(0, 16, 0, 0));
-        panel.setPrefWidth(360);
+        panel.setPadding(new Insets(16));
         VBox.setVgrow(employeeTable, Priority.ALWAYS);
         return panel;
     }
 
-    private VBox buildAttendancePanel() {
-        Label section = new Label("Attendance Monitoring");
+    private VBox buildScanPanel() {
+        Label section = new Label("Scan Wajah & Attendance Monitoring");
         section.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+
+        cameraIndexField.setPrefWidth(60);
+        autoAttendanceCheckBox.setOnAction(event -> context.autoAttendanceService().setAutoModeEnabled(autoAttendanceCheckBox.isSelected()));
+
+        Button startCamera = new Button("Start Camera");
+        startCamera.setOnAction(event -> startCamera());
+
+        Button stopCamera = new Button("Stop Camera");
+        stopCamera.setOnAction(event -> stopCamera());
+
+        Button simulateNormal = new Button("Simulate Normal Face");
+        simulateNormal.setOnAction(event -> handleRecognition(false));
+
+        Button simulateMasked = new Button("Simulate Masked Face");
+        simulateMasked.setOnAction(event -> handleRecognition(true));
+
+        HBox actions = new HBox(
+                10,
+                new Label("Camera"),
+                cameraIndexField,
+                startCamera,
+                stopCamera,
+                autoAttendanceCheckBox,
+                simulateNormal,
+                simulateMasked
+        );
+        actions.setAlignment(Pos.CENTER_LEFT);
+
+        HBox cameraStatus = new HBox(10, new Label("Status:"), cameraStatusLabel, new Label("Detection:"), detectionStatusLabel, evidenceStatusLabel);
+        cameraStatus.setAlignment(Pos.CENTER_LEFT);
 
         configureAttendanceTable();
         eventList.setPrefHeight(170);
+        cameraPreview.setFitWidth(500);
+        cameraPreview.setFitHeight(280);
+        cameraPreview.setPreserveRatio(true);
+        cameraPreview.setSmooth(true);
 
         Button refreshButton = new Button("Refresh History");
         refreshButton.setOnAction(event -> {
@@ -138,8 +189,19 @@ public class MainDashboard {
 
         HBox buttons = new HBox(10, refreshButton, deleteButton);
 
-        VBox panel = new VBox(10, section, new Label("Recognition Events"), eventList, buttons, attendanceTable);
-        panel.setPadding(new Insets(0, 16, 0, 16));
+        VBox panel = new VBox(
+                10,
+                section,
+                actions,
+                cameraStatus,
+                new Label("Live Camera Preview"),
+                cameraPreview,
+                new Label("Recognition Events"),
+                eventList,
+                buttons,
+                attendanceTable
+        );
+        panel.setPadding(new Insets(16));
         VBox.setVgrow(attendanceTable, Priority.ALWAYS);
         return panel;
     }
@@ -171,8 +233,7 @@ public class MainDashboard {
         filters.add(applyButton, 1, 4);
 
         VBox panel = new VBox(10, section, filters, new Label("CSV Export Preview"), reportPreview);
-        panel.setPadding(new Insets(0, 0, 0, 16));
-        panel.setPrefWidth(400);
+        panel.setPadding(new Insets(16));
         VBox.setVgrow(reportPreview, Priority.ALWAYS);
         return panel;
     }
@@ -218,6 +279,55 @@ public class MainDashboard {
         refreshAttendance();
         refreshReport();
         refreshSummary();
+    }
+
+    private void startCamera() {
+        int cameraIndex;
+        try {
+            cameraIndex = Integer.parseInt(cameraIndexField.getText().trim());
+        } catch (NumberFormatException exception) {
+            cameraStatusLabel.setText("Invalid camera index");
+            return;
+        }
+
+        context.cameraCaptureService().startCamera(
+                cameraIndex,
+                this::renderDetectionFrame,
+                status -> cameraStatusLabel.setText(status)
+        );
+    }
+
+    private void stopCamera() {
+        context.cameraCaptureService().stopCamera();
+        cameraStatusLabel.setText("Camera stopping...");
+    }
+
+    private void renderDetectionFrame(DetectionFrame frame) {
+        cameraPreview.setImage(frame.image());
+        if (frame.detectorReady()) {
+            detectionStatusLabel.setText("Faces detected: " + frame.faceCount());
+        } else {
+            detectionStatusLabel.setText(frame.detectorStatus());
+        }
+
+        if (context.cameraCaptureService().getLastDetectionArtifact() != null) {
+            evidenceStatusLabel.setText("Evidence ready");
+        } else {
+            evidenceStatusLabel.setText("Evidence: none");
+        }
+
+        RecognitionEvent autoEvent = context.autoAttendanceService().tryAutoAttendance("CAM-01", false);
+        if (autoEvent != null) {
+            eventList.getItems().add(0, String.format(
+                    "AUTO | %s | %s | confidence %.1f%% | %s",
+                    autoEvent.employeeName(),
+                    autoEvent.recognizedAt().format(TIMESTAMP_FORMAT),
+                    autoEvent.confidence() * 100,
+                    autoEvent.status()));
+            refreshAttendance();
+            refreshReport();
+            refreshSummary();
+        }
     }
 
     private void deleteSelectedAttendance() {
