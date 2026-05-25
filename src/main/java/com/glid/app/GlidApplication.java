@@ -6,6 +6,8 @@ import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
+import java.util.Objects;
+
 public class GlidApplication extends Application {
     private AppContext context;
 
@@ -15,7 +17,9 @@ public class GlidApplication extends Application {
         MainDashboard dashboard = new MainDashboard(context);
 
         stage.setTitle("Glid - Offline Attendance System");
-        stage.setScene(new Scene(dashboard.build(), 1280, 820));
+        Scene scene = new Scene(dashboard.build(), 1280, 820);
+        scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/styles/mistral-theme.css")).toExternalForm());
+        stage.setScene(scene);
         stage.setMinWidth(1100);
         stage.setMinHeight(760);
         stage.setOnCloseRequest(event -> context.cameraCaptureService().shutdown());

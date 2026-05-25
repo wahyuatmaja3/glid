@@ -1,6 +1,7 @@
 package com.glid.ui;
 
 import com.glid.app.AppContext;
+import com.glid.model.DetectionArtifact;
 import com.glid.model.DetectionFrame;
 import com.glid.model.Employee;
 import com.glid.model.RecognitionEvent;
@@ -8,238 +9,166 @@ import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
+import javafx.scene.input.KeyCode;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
-import javafx.scene.control.Tab;
-import javafx.scene.control.TabPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
 public class MainDashboard {
     private static final DateTimeFormatter TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
 
     private final AppContext context;
-    private final TableView<EmployeeRow> employeeTable = new TableView<>();
     private final TableView<AttendanceRow> attendanceTable = new TableView<>();
+    private final TableView<AttendanceRow> reportTable = new TableView<>();
     private final ListView<String> eventList = new ListView<>();
-    private final TextArea reportPreview = new TextArea();
     private final TextField employeeCodeField = new TextField();
     private final TextField fullNameField = new TextField();
     private final TextField departmentField = new TextField();
     private final TextField positionField = new TextField();
     private final CheckBox activeCheckBox = new CheckBox("Active");
-    private final CheckBox maskCheckBox = new CheckBox("Mask registered");
-    private final Label summaryLabel = new Label();
-    private final DatePicker fromDate = new DatePicker(LocalDate.now().minusDays(7));
-    private final DatePicker toDate = new DatePicker(LocalDate.now());
-    private final TextField filterDepartmentField = new TextField();
-    private final TextField filterEmployeeCodeField = new TextField();
+    private final CheckBox maskCheckBox = new CheckBox("Mask");
     private final TextField cameraIndexField = new TextField("0");
     private final Label cameraStatusLabel = new Label("Camera idle");
     private final Label detectionStatusLabel = new Label("Faces detected: 0");
     private final Label evidenceStatusLabel = new Label("Evidence: none");
-    private final CheckBox autoAttendanceCheckBox = new CheckBox("Auto attendance");
+    private final Label evidenceEmployeeLabel = new Label("Employee: -");
+    private final CheckBox autoAttendanceCheckBox = new CheckBox("Auto");
     private final ImageView cameraPreview = new ImageView();
+    private final Label registerFaceStatusLabel = new Label("Face sample: not captured");
+    private VBox quickRegisterPanel;
+    private HBox cameraControls;
+    private VBox reportPanel;
 
-    public MainDashboard(AppContext context) {
-        this.context = context;
-    }
+    public MainDashboard(AppContext context) { this.context = context; }
 
     public Parent build() {
         BorderPane root = new BorderPane();
-        root.setPadding(new Insets(16));
+        root.getStyleClass().addAll("app-root", "kiosk-root");
+        root.setPadding(new Insets(8));
         autoAttendanceCheckBox.setSelected(context.autoAttendanceService().isAutoModeEnabled());
-        root.setTop(buildHeader());
-        root.setCenter(buildMainTabs());
-        refreshEmployees();
+        root.setCenter(buildKioskView());
+        root.setFocusTraversable(true);
+        root.setOnKeyPressed(event -> handleHotkey(event.getCode()));
         refreshAttendance();
-        refreshSummary();
-        refreshReport();
         return root;
     }
 
-    private VBox buildHeader() {
-        Label title = new Label("Glid Offline Face Recognition Attendance");
-        title.setStyle("-fx-font-size: 22px; -fx-font-weight: bold;");
+    private VBox buildKioskView() {
+        Label title = new Label("GLID KIOSK");
+        title.getStyleClass().add("kiosk-title");
 
-        Label subtitle = new Label("MVP desktop dashboard with dedicated tabs for registration, face scan monitoring, and attendance reporting.");
-        subtitle.setWrapText(true);
+        Label subtitle = new Label("Face attendance realtime");
+        subtitle.getStyleClass().add("kiosk-subtitle");
 
-        HBox summary = new HBox(8, new Label("Summary:"), summaryLabel);
-        summary.setAlignment(Pos.CENTER_LEFT);
-
-        VBox box = new VBox(8, title, subtitle, summary);
-        box.setPadding(new Insets(0, 0, 16, 0));
-        return box;
+        quickRegisterPanel = buildQuickRegisterPanel();
+        VBox scanPanel = buildScanPanel();
+        reportPanel = buildReportPanel();
+        setVisibleManaged(quickRegisterPanel, false);
+        setVisibleManaged(reportPanel, false);
+        return new VBox(8, title, subtitle, quickRegisterPanel, scanPanel, reportPanel);
     }
 
-    private TabPane buildMainTabs() {
-        Tab registerTab = new Tab("Register", buildRegistrationPanel());
-        registerTab.setClosable(false);
-
-        Tab faceScanTab = new Tab("Scan Wajah", buildScanPanel());
-        faceScanTab.setClosable(false);
-
-        Tab reportTab = new Tab("Report", buildReportPanel());
-        reportTab.setClosable(false);
-
-        TabPane tabPane = new TabPane(registerTab, faceScanTab, reportTab);
-        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        return tabPane;
-    }
-
-    private VBox buildRegistrationPanel() {
-        Label section = new Label("Employee Registration");
-        section.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
-
-        employeeCodeField.setPromptText("EMP-004");
-        fullNameField.setPromptText("Full name");
-        departmentField.setPromptText("Department");
+    private VBox buildQuickRegisterPanel() {
+        employeeCodeField.setPromptText("Code");
+        fullNameField.setPromptText("Name");
+        departmentField.setPromptText("Dept");
         positionField.setPromptText("Position");
         activeCheckBox.setSelected(true);
 
-        Button registerButton = new Button("Register Employee");
-        registerButton.setMaxWidth(Double.MAX_VALUE);
+        Button captureFaceButton = new Button("Capture");
+        captureFaceButton.setOnAction(event -> captureFaceSampleForRegistration());
+        Button registerButton = new Button("Register");
         registerButton.setOnAction(event -> handleRegisterEmployee());
 
-        configureEmployeeTable();
+        HBox row1 = new HBox(8, employeeCodeField, fullNameField, departmentField, positionField);
+        HBox row2 = new HBox(8, activeCheckBox, maskCheckBox, captureFaceButton, registerButton, registerFaceStatusLabel);
 
-        VBox panel = new VBox(
-                10,
-                section,
-                labeled("Employee Code", employeeCodeField),
-                labeled("Full Name", fullNameField),
-                labeled("Department", departmentField),
-                labeled("Position", positionField),
-                activeCheckBox,
-                maskCheckBox,
-                registerButton,
-                new Label("Registered Employees"),
-                employeeTable
-        );
-        panel.setPadding(new Insets(16));
-        VBox.setVgrow(employeeTable, Priority.ALWAYS);
+        VBox panel = new VBox(8, row1, row2);
+        panel.getStyleClass().add("panel-card");
+        panel.setPadding(new Insets(10));
         return panel;
     }
 
     private VBox buildScanPanel() {
-        Label section = new Label("Scan Wajah & Attendance Monitoring");
-        section.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
-
-        cameraIndexField.setPrefWidth(60);
+        cameraIndexField.setPrefWidth(56);
         autoAttendanceCheckBox.setOnAction(event -> context.autoAttendanceService().setAutoModeEnabled(autoAttendanceCheckBox.isSelected()));
 
-        Button startCamera = new Button("Start Camera");
+        Button startCamera = new Button("Start");
         startCamera.setOnAction(event -> startCamera());
-
-        Button stopCamera = new Button("Stop Camera");
+        Button stopCamera = new Button("Stop");
         stopCamera.setOnAction(event -> stopCamera());
 
-        Button simulateNormal = new Button("Simulate Normal Face");
-        simulateNormal.setOnAction(event -> handleRecognition(false));
+        cameraControls = new HBox(6, cameraIndexField, startCamera, stopCamera, autoAttendanceCheckBox);
+        cameraControls.getStyleClass().addAll("toolbar-row", "camera-overlay-controls");
+        cameraControls.setAlignment(Pos.CENTER_RIGHT);
+        setVisibleManaged(cameraControls, false);
 
-        Button simulateMasked = new Button("Simulate Masked Face");
-        simulateMasked.setOnAction(event -> handleRecognition(true));
-
-        HBox actions = new HBox(
-                10,
-                new Label("Camera"),
-                cameraIndexField,
-                startCamera,
-                stopCamera,
-                autoAttendanceCheckBox,
-                simulateNormal,
-                simulateMasked
-        );
-        actions.setAlignment(Pos.CENTER_LEFT);
-
-        HBox cameraStatus = new HBox(10, new Label("Status:"), cameraStatusLabel, new Label("Detection:"), detectionStatusLabel, evidenceStatusLabel);
-        cameraStatus.setAlignment(Pos.CENTER_LEFT);
+        HBox cameraStatus = new HBox(10, cameraStatusLabel, detectionStatusLabel);
+        cameraStatus.getStyleClass().addAll("status-row", "compact-muted-row");
 
         configureAttendanceTable();
-        eventList.setPrefHeight(170);
-        cameraPreview.setFitWidth(500);
-        cameraPreview.setFitHeight(280);
+        eventList.setPrefHeight(110);
+        cameraPreview.setFitWidth(1200);
+        cameraPreview.setFitHeight(620);
         cameraPreview.setPreserveRatio(true);
-        cameraPreview.setSmooth(true);
 
-        Button refreshButton = new Button("Refresh History");
-        refreshButton.setOnAction(event -> {
-            refreshAttendance();
-            refreshReport();
-        });
+        VBox evidenceBox = new VBox(4, new Label("Evidence"), evidenceStatusLabel, evidenceEmployeeLabel);
+        evidenceBox.getStyleClass().add("evidence-box");
 
-        Button deleteButton = new Button("Delete Selected Log");
-        deleteButton.setOnAction(event -> deleteSelectedAttendance());
+        StackPane cameraArea = new StackPane(cameraPreview, cameraControls);
+        cameraArea.getStyleClass().add("camera-stage");
+        StackPane.setAlignment(cameraControls, Pos.TOP_RIGHT);
 
-        HBox buttons = new HBox(10, refreshButton, deleteButton);
-
-        VBox panel = new VBox(
-                10,
-                section,
-                actions,
-                cameraStatus,
-                new Label("Live Camera Preview"),
-                cameraPreview,
-                new Label("Recognition Events"),
-                eventList,
-                buttons,
-                attendanceTable
-        );
-        panel.setPadding(new Insets(16));
+        VBox panel = new VBox(8, cameraStatus, cameraArea, evidenceBox, eventList, attendanceTable);
+        panel.getStyleClass().add("panel-card");
+        panel.setPadding(new Insets(10));
         VBox.setVgrow(attendanceTable, Priority.ALWAYS);
         return panel;
     }
 
     private VBox buildReportPanel() {
-        Label section = new Label("Attendance Report");
-        section.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
-
-        filterDepartmentField.setPromptText("Department filter");
-        filterEmployeeCodeField.setPromptText("Employee code filter");
-
-        Button applyButton = new Button("Generate Preview");
-        applyButton.setOnAction(event -> refreshReport());
-
-        reportPreview.setEditable(false);
-        reportPreview.setWrapText(false);
-
-        GridPane filters = new GridPane();
-        filters.setHgap(8);
-        filters.setVgap(8);
-        filters.add(new Label("From"), 0, 0);
-        filters.add(fromDate, 1, 0);
-        filters.add(new Label("To"), 0, 1);
-        filters.add(toDate, 1, 1);
-        filters.add(new Label("Department"), 0, 2);
-        filters.add(filterDepartmentField, 1, 2);
-        filters.add(new Label("Employee Code"), 0, 3);
-        filters.add(filterEmployeeCodeField, 1, 3);
-        filters.add(applyButton, 1, 4);
-
-        VBox panel = new VBox(10, section, filters, new Label("CSV Export Preview"), reportPreview);
-        panel.setPadding(new Insets(16));
-        VBox.setVgrow(reportPreview, Priority.ALWAYS);
+        Label reportTitle = new Label("Report");
+        reportTitle.getStyleClass().add("section-title");
+        configureReportTable();
+        VBox panel = new VBox(8, reportTitle, reportTable);
+        panel.getStyleClass().add("panel-card");
+        panel.setPadding(new Insets(10));
+        VBox.setVgrow(reportTable, Priority.ALWAYS);
         return panel;
     }
 
-    private VBox labeled(String label, TextField field) {
-        return new VBox(4, new Label(label), field);
+    private void handleHotkey(KeyCode code) {
+        if (code == KeyCode.F1) {
+            setVisibleManaged(quickRegisterPanel, !quickRegisterPanel.isVisible());
+        } else if (code == KeyCode.F2) {
+            autoAttendanceCheckBox.setSelected(true);
+            context.autoAttendanceService().setAutoModeEnabled(true);
+            if (context.cameraCaptureService().isRunning()) {
+                stopCamera();
+            } else {
+                startCamera();
+            }
+        } else if (code == KeyCode.F3) {
+            setVisibleManaged(reportPanel, !reportPanel.isVisible());
+        }
+    }
+
+    private void setVisibleManaged(javafx.scene.Node node, boolean visible) {
+        node.setVisible(visible);
+        node.setManaged(visible);
     }
 
     private void handleRegisterEmployee() {
@@ -247,186 +176,104 @@ public class MainDashboard {
             eventList.getItems().add(0, "Registration blocked: employee code, full name, and department are required.");
             return;
         }
-
-        Employee employee = context.employeeService().registerEmployee(
-                employeeCodeField.getText().trim(),
-                fullNameField.getText().trim(),
-                departmentField.getText().trim(),
-                positionField.getText().trim(),
-                activeCheckBox.isSelected(),
-                maskCheckBox.isSelected()
-        );
-
-        eventList.getItems().add(0, "Registered " + employee.fullName() + " with 5 generated face embeddings.");
-        employeeCodeField.clear();
-        fullNameField.clear();
-        departmentField.clear();
-        positionField.clear();
-        maskCheckBox.setSelected(false);
-        activeCheckBox.setSelected(true);
-        refreshEmployees();
-        refreshSummary();
+        DetectionArtifact artifact = context.cameraCaptureService().getLastDetectionArtifact();
+        if (artifact == null) {
+            eventList.getItems().add(0, "Registration blocked: no detected face yet.");
+            return;
+        }
+        try {
+            Employee employee = context.employeeService().registerEmployee(
+                    employeeCodeField.getText().trim(), fullNameField.getText().trim(), departmentField.getText().trim(),
+                    positionField.getText().trim(), activeCheckBox.isSelected(), maskCheckBox.isSelected());
+            eventList.getItems().add(0, "Registered " + employee.fullName());
+            refreshRegistrationFaceStatus();
+        } catch (IllegalStateException exception) {
+            eventList.getItems().add(0, "Registration failed: employee code already exists or data is invalid.");
+        }
     }
 
-    private void handleRecognition(boolean masked) {
-        RecognitionEvent event = context.pipeline().simulateRecognition("CAM-01", masked);
-        eventList.getItems().add(0, String.format(
-                "%s | %s | confidence %.1f%% | %s",
-                event.employeeName(),
-                event.recognizedAt().format(TIMESTAMP_FORMAT),
-                event.confidence() * 100,
-                event.status()));
-        refreshAttendance();
-        refreshReport();
-        refreshSummary();
+    private void captureFaceSampleForRegistration() {
+        DetectionArtifact artifact = context.cameraCaptureService().getLastDetectionArtifact();
+        if (artifact == null) {
+            registerFaceStatusLabel.setText("Face sample: not captured");
+            return;
+        }
+        registerFaceStatusLabel.setText("Face sample: " + artifact.capturedAt().format(TIMESTAMP_FORMAT));
+    }
+
+    private void refreshRegistrationFaceStatus() {
+        DetectionArtifact artifact = context.cameraCaptureService().getLastDetectionArtifact();
+        if (artifact == null) {
+            registerFaceStatusLabel.setText("Face sample: not captured");
+            return;
+        }
+        registerFaceStatusLabel.setText("Face sample: " + artifact.capturedAt().format(TIMESTAMP_FORMAT));
     }
 
     private void startCamera() {
         int cameraIndex;
-        try {
-            cameraIndex = Integer.parseInt(cameraIndexField.getText().trim());
-        } catch (NumberFormatException exception) {
-            cameraStatusLabel.setText("Invalid camera index");
-            return;
-        }
-
-        context.cameraCaptureService().startCamera(
-                cameraIndex,
-                this::renderDetectionFrame,
-                status -> cameraStatusLabel.setText(status)
-        );
+        try { cameraIndex = Integer.parseInt(cameraIndexField.getText().trim()); }
+        catch (NumberFormatException exception) { cameraStatusLabel.setText("Invalid camera index"); return; }
+        context.cameraCaptureService().startCamera(cameraIndex, this::renderDetectionFrame, status -> cameraStatusLabel.setText(status));
     }
 
-    private void stopCamera() {
-        context.cameraCaptureService().stopCamera();
-        cameraStatusLabel.setText("Camera stopping...");
-    }
+    private void stopCamera() { context.cameraCaptureService().stopCamera(); }
 
     private void renderDetectionFrame(DetectionFrame frame) {
         cameraPreview.setImage(frame.image());
-        if (frame.detectorReady()) {
-            detectionStatusLabel.setText("Faces detected: " + frame.faceCount());
-        } else {
-            detectionStatusLabel.setText(frame.detectorStatus());
-        }
-
-        if (context.cameraCaptureService().getLastDetectionArtifact() != null) {
-            evidenceStatusLabel.setText("Evidence ready");
-        } else {
-            evidenceStatusLabel.setText("Evidence: none");
-        }
+        detectionStatusLabel.setText(frame.detectorReady() ? "Faces detected: " + frame.faceCount() : frame.detectorStatus());
+        if (context.cameraCaptureService().getLastDetectionArtifact() != null) evidenceStatusLabel.setText("Evidence ready");
+        else { evidenceStatusLabel.setText("Evidence: none"); evidenceEmployeeLabel.setText("Employee: -"); }
 
         RecognitionEvent autoEvent = context.autoAttendanceService().tryAutoAttendance("CAM-01", false);
         if (autoEvent != null) {
-            eventList.getItems().add(0, String.format(
-                    "AUTO | %s | %s | confidence %.1f%% | %s",
-                    autoEvent.employeeName(),
-                    autoEvent.recognizedAt().format(TIMESTAMP_FORMAT),
-                    autoEvent.confidence() * 100,
-                    autoEvent.status()));
+            evidenceEmployeeLabel.setText("Employee: " + autoEvent.employeeName());
+            eventList.getItems().add(0, String.format("AUTO | %s | %s | %.1f%% | %s", autoEvent.employeeName(), autoEvent.recognizedAt().format(TIMESTAMP_FORMAT), autoEvent.confidence() * 100, autoEvent.status()));
             refreshAttendance();
-            refreshReport();
-            refreshSummary();
         }
-    }
-
-    private void deleteSelectedAttendance() {
-        AttendanceRow selected = attendanceTable.getSelectionModel().getSelectedItem();
-        if (selected == null) {
-            eventList.getItems().add(0, "Delete skipped: choose an attendance log first.");
-            return;
-        }
-
-        context.attendanceService().delete(selected.id());
-        eventList.getItems().add(0, "Deleted attendance log " + selected.id() + " for " + selected.employeeName() + ".");
-        refreshAttendance();
-        refreshReport();
-        refreshSummary();
-    }
-
-    private void refreshEmployees() {
-        employeeTable.setItems(FXCollections.observableArrayList(
-                context.employeeService().findAll().stream()
-                        .map(employee -> new EmployeeRow(
-                                employee.id(),
-                                employee.employeeCode(),
-                                employee.fullName(),
-                                employee.department(),
-                                employee.position(),
-                                employee.active() ? "Active" : "Inactive",
-                                employee.maskRegistered() ? "Yes" : "No"
-                        ))
-                        .toList()));
     }
 
     private void refreshAttendance() {
-        attendanceTable.setItems(FXCollections.observableArrayList(
-                context.attendanceService().history().stream()
-                        .map(log -> new AttendanceRow(
-                                log.id(),
-                                log.employeeCode(),
-                                log.employeeName(),
-                                log.attendanceType().name(),
-                                log.timestamp().format(TIMESTAMP_FORMAT),
-                                log.cameraId(),
-                                log.imagePath()
-                        ))
-                        .toList()));
-    }
-
-    private void refreshReport() {
-        reportPreview.setText(context.reportService().exportCsvPreview(
-                fromDate.getValue(),
-                toDate.getValue(),
-                filterDepartmentField.getText().trim(),
-                filterEmployeeCodeField.getText().trim()
-        ));
-    }
-
-    private void refreshSummary() {
-        summaryLabel.setText("Employees: " + context.reportService().totalEmployees() + " | Logs: " + context.attendanceService().history().size());
-    }
-
-    private void configureEmployeeTable() {
-        TableColumn<EmployeeRow, String> code = new TableColumn<>("Code");
-        code.setCellValueFactory(new PropertyValueFactory<>("employeeCode"));
-
-        TableColumn<EmployeeRow, String> name = new TableColumn<>("Name");
-        name.setCellValueFactory(new PropertyValueFactory<>("fullName"));
-
-        TableColumn<EmployeeRow, String> department = new TableColumn<>("Dept");
-        department.setCellValueFactory(new PropertyValueFactory<>("department"));
-
-        TableColumn<EmployeeRow, String> status = new TableColumn<>("Status");
-        status.setCellValueFactory(new PropertyValueFactory<>("status"));
-
-        employeeTable.getColumns().setAll(code, name, department, status);
-        employeeTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        var rows = FXCollections.observableArrayList(
+                context.attendanceService().history().stream().map(log -> new AttendanceRow(
+                        log.id(), log.employeeCode(), log.employeeName(), log.attendanceType().name(),
+                        log.timestamp().format(TIMESTAMP_FORMAT), log.cameraId(), log.imagePath())).toList());
+        attendanceTable.setItems(rows);
+        reportTable.setItems(FXCollections.observableArrayList(rows));
     }
 
     private void configureAttendanceTable() {
         TableColumn<AttendanceRow, Long> id = new TableColumn<>("ID");
         id.setCellValueFactory(new PropertyValueFactory<>("id"));
-
         TableColumn<AttendanceRow, String> employeeCode = new TableColumn<>("Code");
         employeeCode.setCellValueFactory(new PropertyValueFactory<>("employeeCode"));
-
         TableColumn<AttendanceRow, String> employeeName = new TableColumn<>("Name");
         employeeName.setCellValueFactory(new PropertyValueFactory<>("employeeName"));
-
         TableColumn<AttendanceRow, String> type = new TableColumn<>("Type");
         type.setCellValueFactory(new PropertyValueFactory<>("attendanceType"));
-
         TableColumn<AttendanceRow, String> timestamp = new TableColumn<>("Timestamp");
         timestamp.setCellValueFactory(new PropertyValueFactory<>("timestamp"));
-
         attendanceTable.getColumns().setAll(id, employeeCode, employeeName, type, timestamp);
         attendanceTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
     }
 
-    public record EmployeeRow(long id, String employeeCode, String fullName, String department, String position, String status, String maskRegistered) {
+    private void configureReportTable() {
+        if (!reportTable.getColumns().isEmpty()) {
+            return;
+        }
+        TableColumn<AttendanceRow, Long> id = new TableColumn<>("ID");
+        id.setCellValueFactory(new PropertyValueFactory<>("id"));
+        TableColumn<AttendanceRow, String> employeeCode = new TableColumn<>("Code");
+        employeeCode.setCellValueFactory(new PropertyValueFactory<>("employeeCode"));
+        TableColumn<AttendanceRow, String> employeeName = new TableColumn<>("Name");
+        employeeName.setCellValueFactory(new PropertyValueFactory<>("employeeName"));
+        TableColumn<AttendanceRow, String> type = new TableColumn<>("Type");
+        type.setCellValueFactory(new PropertyValueFactory<>("attendanceType"));
+        TableColumn<AttendanceRow, String> timestamp = new TableColumn<>("Timestamp");
+        timestamp.setCellValueFactory(new PropertyValueFactory<>("timestamp"));
+        reportTable.getColumns().setAll(id, employeeCode, employeeName, type, timestamp);
+        reportTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
     }
 
-    public record AttendanceRow(long id, String employeeCode, String employeeName, String attendanceType, String timestamp, String cameraId, String imagePath) {
-    }
+    public record AttendanceRow(long id, String employeeCode, String employeeName, String attendanceType, String timestamp, String cameraId, String imagePath) {}
 }

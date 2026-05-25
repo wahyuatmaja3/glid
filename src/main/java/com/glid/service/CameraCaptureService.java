@@ -167,10 +167,10 @@ public class CameraCaptureService {
             faceClassifier.detectMultiScale(
                     grayscaleFrame,
                     faces,
-                    1.1,
-                    4,
+                    1.05,
+                    3,
                     0,
-                    new Size(80, 80),
+                    new Size(48, 48),
                     new Size()
             );
 
@@ -192,10 +192,7 @@ public class CameraCaptureService {
 
         updateDetectionArtifact(originalFrame, detectedFaces);
 
-        Mat rgbFrame = new Mat();
-        Imgproc.cvtColor(annotatedFrame, rgbFrame, Imgproc.COLOR_BGR2RGB);
-        Image image = matToImage(rgbFrame);
-        rgbFrame.release();
+        Image image = matToImage(annotatedFrame);
         annotatedFrame.release();
         return new DetectionFrame(image, faceCount, isDetectorReady(), classifierStatus);
     }

@@ -1,0 +1,219 @@
+.root {
+    -fx-font-family: "Inter", "Segoe UI", sans-serif;
+    -fx-background-color: #f7f5ef;
+    -fx-text-fill: #1a1a1a;
+}
+
+.app-root {
+    -fx-background-color: linear-gradient(to bottom, #f7f5ef 0%, #fffef9 72%, #fff2d4 100%);
+}
+
+.kiosk-root {
+    -fx-background-color: #101010;
+}
+
+.kiosk-title {
+    -fx-text-fill: #fff4d6;
+    -fx-font-size: 20px;
+    -fx-font-weight: 700;
+}
+
+.kiosk-subtitle {
+    -fx-text-fill: #f5c46b;
+    -fx-font-size: 12px;
+}
+
+.kiosk-panel .panel-scroll,
+.kiosk-panel .panel-card {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.hero-header {
+    -fx-padding: 20 24 20 24;
+    -fx-background-color: linear-gradient(to right, rgba(245, 167, 64, 0.20) 0%, rgba(235, 102, 25, 0.25) 52%, rgba(255, 231, 178, 0.7) 100%);
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: #deceb1;
+    -fx-border-width: 1;
+}
+
+.hero-title {
+    -fx-font-family: "Times New Roman", Georgia, serif;
+    -fx-font-size: 42px;
+    -fx-font-weight: 400;
+    -fx-letter-spacing: -1.1px;
+    -fx-text-fill: #201813;
+}
+
+.hero-subtitle {
+    -fx-font-size: 16px;
+    -fx-text-fill: #43372d;
+}
+
+.summary-row {
+    -fx-background-color: #fff6df;
+    -fx-padding: 10 12 10 12;
+    -fx-background-radius: 8;
+}
+
+.main-tabs {
+    -fx-tab-min-height: 40;
+}
+
+.main-tabs .tab-header-background {
+    -fx-background-color: #fffef9;
+    -fx-border-color: transparent transparent #eadfcd transparent;
+}
+
+.main-tabs .tab {
+    -fx-background-color: #fff8e8;
+    -fx-background-radius: 8 8 0 0;
+    -fx-padding: 8 14 8 14;
+}
+
+.main-tabs .tab:selected {
+    -fx-background-color: #eb6619;
+}
+
+.main-tabs .tab:selected .tab-label {
+    -fx-text-fill: white;
+    -fx-font-weight: 600;
+}
+
+.panel-card {
+    -fx-background-color: #fff6df;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: #deceb1;
+    -fx-border-width: 1;
+}
+
+.section-title {
+    -fx-font-size: 24px;
+    -fx-font-weight: 600;
+    -fx-text-fill: #1f1b17;
+}
+
+.button {
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-padding: 10 18 10 18;
+    -fx-font-size: 14px;
+    -fx-font-weight: 500;
+    -fx-background-color: #eb6619;
+    -fx-text-fill: #ffffff;
+}
+
+.button:hover {
+    -fx-background-color: #d9550c;
+}
+
+.button:pressed {
+    -fx-background-color: #bc4404;
+}
+
+.text-field, .text-area, .date-picker {
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-border-color: #c6baab;
+    -fx-border-width: 1;
+    -fx-background-color: #fffef9;
+}
+
+.text-field:focused, .text-area:focused, .date-picker:focused {
+    -fx-border-color: #eb6619;
+    -fx-border-width: 2;
+}
+
+.table-view, .list-view, .text-area {
+    -fx-background-color: #fffef9;
+    -fx-border-color: #e0d6c4;
+    -fx-border-radius: 12;
+    -fx-background-radius: 12;
+}
+
+.table-view .column-header-background {
+    -fx-background-color: #ffe7b2;
+}
+
+.table-view .column-header,
+.table-view .filler {
+    -fx-size: 36;
+    -fx-border-color: transparent transparent #e7d9c0 transparent;
+}
+
+.toolbar-row,
+.status-row {
+    -fx-padding: 6 0 6 0;
+}
+
+.panel-scroll {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.panel-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.camera-stage {
+    -fx-background-color: #111111;
+    -fx-background-radius: 12;
+    -fx-padding: 4;
+}
+
+.camera-overlay-controls {
+    -fx-padding: 8;
+}
+
+.camera-overlay-controls .button {
+    -fx-padding: 4 8 4 8;
+    -fx-font-size: 11px;
+}
+
+.camera-overlay-controls .check-box {
+    -fx-font-size: 11px;
+    -fx-text-fill: white;
+}
+
+.camera-overlay-controls .text-field {
+    -fx-pref-width: 52;
+    -fx-max-width: 52;
+    -fx-padding: 3 6 3 6;
+    -fx-font-size: 11px;
+}
+
+.compact-muted-row {
+    -fx-font-size: 12px;
+}
+
+.evidence-box {
+    -fx-background-color: #1b1b1b;
+    -fx-border-color: #4b3a22;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 8;
+}
+
+.evidence-box .label {
+    -fx-text-fill: #f7e7c6;
+}
+
+.status-row .label,
+.compact-muted-row .label {
+    -fx-text-fill: #f2e2c2;
+}
+
+.list-view,
+.table-view {
+    -fx-background-color: #161616;
+    -fx-border-color: #3c2f1d;
+}
+
+.list-cell,
+.table-row-cell {
+    -fx-background-color: #161616;
+    -fx-text-fill: #f1e8d3;
+}
