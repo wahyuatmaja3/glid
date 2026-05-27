@@ -43,6 +43,25 @@ public class EmployeeService {
         return employee;
     }
 
+    public Employee registerEmployeeWithArtifact(String employeeCode, String fullName, String department, String position, boolean active, boolean maskRegistered, DetectionArtifact artifact) {
+        Employee employee = store.saveEmployee(employeeCode, fullName, department, position, active, maskRegistered);
+
+        if (artifact != null) {
+            List<Double> baseEmbedding = embeddingExtractor.extract(Path.of(artifact.faceCropPath()));
+            if (!baseEmbedding.isEmpty()) {
+                for (int i = 0; i < 5; i++) {
+                    store.saveEmbedding(employee.id(), varyEmbedding(baseEmbedding, i), maskRegistered && i % 2 == 0);
+                }
+                return employee;
+            }
+        }
+
+        for (int i = 0; i < 5; i++) {
+            store.saveEmbedding(employee.id(), fallbackEmbedding(employeeCode, i), maskRegistered && i % 2 == 0);
+        }
+        return employee;
+    }
+
     public Employee findById(long employeeId) {
         return store.findEmployeeById(employeeId);
     }

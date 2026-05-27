@@ -45,6 +45,7 @@ public class CameraCaptureService {
     private volatile String classifierStatus = "Detector not loaded";
     private volatile DetectionArtifact lastDetectionArtifact;
     private volatile Instant lastEvidenceSavedAt;
+    private volatile String faceOverlayName = "";
 
     public synchronized void startCamera(int cameraIndex, Consumer<DetectionFrame> frameConsumer, Consumer<String> statusConsumer) {
         if (running.get()) {
@@ -81,7 +82,7 @@ public class CameraCaptureService {
                 Image image = detectionFrame.image();
                 lastFrame = image;
                 Platform.runLater(() -> frameConsumer.accept(detectionFrame));
-                sleep(33);
+                sleep(50);
             }
 
             frame.release();
@@ -141,6 +142,24 @@ public class CameraCaptureService {
         return lastDetectionArtifact;
     }
 
+    public void setFaceOverlayName(String faceOverlayName) {
+        this.faceOverlayName = faceOverlayName == null ? "" : faceOverlayName.trim();
+    }
+
+    public void discardLastDetectionArtifact() {
+        DetectionArtifact artifact = lastDetectionArtifact;
+        if (artifact == null) {
+            return;
+        }
+
+        try {
+            Files.deleteIfExists(Path.of(artifact.faceCropPath()));
+            Files.deleteIfExists(Path.of(artifact.evidenceImagePath()));
+        } catch (Exception ignored) {
+            // Keep capture loop stable even if cleanup fails.
+        }
+    }
+
     private Image matToImage(Mat mat) {
         MatOfByte encoded = new MatOfByte();
         Imgcodecs.imencode(".bmp", mat, encoded);
@@ -167,10 +186,10 @@ public class CameraCaptureService {
             faceClassifier.detectMultiScale(
                     grayscaleFrame,
                     faces,
-                    1.05,
-                    3,
+                    1.15,
+                    6,
                     0,
-                    new Size(48, 48),
+                    new Size(80, 80),
                     new Size()
             );
 
@@ -184,6 +203,18 @@ public class CameraCaptureService {
                         FACE_BOX_COLOR,
                         2
                 );
+
+                if (!faceOverlayName.isBlank()) {
+                    Imgproc.putText(
+                            annotatedFrame,
+                            faceOverlayName,
+                            new Point(face.x, Math.max(20, face.y - 10)),
+                            Imgproc.FONT_HERSHEY_SIMPLEX,
+                            0.65,
+                            FACE_BOX_COLOR,
+                            2
+                    );
+                }
             }
 
             faces.release();

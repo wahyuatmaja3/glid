@@ -12,6 +12,7 @@ D:\projects\glid\src\main\java\com\glid\service\AttendanceReportService.java
 D:\projects\glid\src\main\java\com\glid\service\AttendanceService.java
 D:\projects\glid\src\main\java\com\glid\service\AutoAttendanceService.java
 D:\projects\glid\src\main\java\com\glid\service\CameraCaptureService.java
+D:\projects\glid\src\main\java\com\glid\service\EigenfacesExtractor.java
 D:\projects\glid\src\main\java\com\glid\service\EmployeeService.java
 D:\projects\glid\src\main\java\com\glid\service\FaceEmbeddingExtractor.java
 D:\projects\glid\src\main\java\com\glid\service\FaceRecognitionPipeline.java

@@ -13,8 +13,8 @@ import java.util.Comparator;
 import java.util.List;
 
 public class FaceRecognitionPipeline {
-    private static final double NORMAL_MATCH_THRESHOLD = 0.965;
-    private static final double MASK_MATCH_THRESHOLD = 0.940;
+    private static final double NORMAL_MATCH_THRESHOLD = 0.65;
+    private static final double MASK_MATCH_THRESHOLD = 0.60;
 
     private final EmployeeService employeeService;
     private final AttendanceService attendanceService;
@@ -70,6 +70,7 @@ public class FaceRecognitionPipeline {
 
         MatchResult match = findBestMatch(activeEmployees, queryEmbedding, masked);
         if (match == null) {
+            cameraCaptureService.discardLastDetectionArtifact();
             return new RecognitionEvent(
                     0,
                     "UNKNOWN",
@@ -119,19 +120,33 @@ public class FaceRecognitionPipeline {
         double threshold = masked ? MASK_MATCH_THRESHOLD : NORMAL_MATCH_THRESHOLD;
         MatchResult best = null;
 
+        System.out.println("[Recognition] Searching match for " + employees.size() + " employees, threshold: " + threshold);
+        
         for (Employee employee : employees) {
             List<FaceEmbedding> embeddings = employeeService.findEmbeddings(employee.id());
+            System.out.println("[Recognition] Employee: " + employee.fullName() + " has " + embeddings.size() + " embeddings");
+            
             for (FaceEmbedding embedding : embeddings) {
                 double similarity = embeddingExtractor.cosineSimilarity(queryEmbedding, embedding.embeddingVector());
+                System.out.println("[Recognition]   Similarity: " + similarity + " (threshold: " + threshold + ")");
+                
                 if (similarity < threshold) {
                     continue;
                 }
 
                 if (best == null || similarity > best.similarity()) {
                     best = new MatchResult(employee, similarity);
+                    System.out.println("[Recognition]   NEW BEST MATCH: " + employee.fullName() + " with " + similarity);
                 }
             }
         }
+        
+        if (best != null) {
+            System.out.println("[Recognition] FINAL MATCH: " + best.employee().fullName() + " with similarity " + best.similarity());
+        } else {
+            System.out.println("[Recognition] NO MATCH FOUND");
+        }
+        
         return best;
     }
 

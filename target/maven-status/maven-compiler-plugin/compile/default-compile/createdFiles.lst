@@ -14,8 +14,10 @@ com\glid\service\AttendanceReportService.class
 com\glid\model\Employee.class
 com\glid\app\GlidApplication.class
 com\glid\service\AttendanceService.class
+com\glid\service\EigenfacesExtractor.class
 com\glid\service\FaceEmbeddingExtractor.class
 com\glid\ui\MainDashboard$AttendanceRow.class
+com\glid\ui\MainDashboard$2.class
 com\glid\service\FaceRecognitionPipeline$MatchResult.class
-com\glid\ui\MainDashboard$EmployeeRow.class
+com\glid\ui\MainDashboard$1.class
 com\glid\model\DetectionArtifact.class

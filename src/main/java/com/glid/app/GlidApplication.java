@@ -20,8 +20,8 @@ public class GlidApplication extends Application {
         Scene scene = new Scene(dashboard.build(), 1280, 820);
         scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/styles/mistral-theme.css")).toExternalForm());
         stage.setScene(scene);
-        stage.setMinWidth(1100);
-        stage.setMinHeight(760);
+        stage.setFullScreen(true);
+        stage.setFullScreenExitHint("");
         stage.setOnCloseRequest(event -> context.cameraCaptureService().shutdown());
         stage.show();
     }
