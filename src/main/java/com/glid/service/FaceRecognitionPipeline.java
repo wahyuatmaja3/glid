@@ -89,7 +89,8 @@ public class FaceRecognitionPipeline {
         String snapshotPath = artifact.faceCropPath();
 
         try {
-            AttendanceLog attendance = attendanceService.recordAttendance(employee.id(), AttendanceType.CHECK_IN, snapshotPath, cameraId);
+            AttendanceType nextType = attendanceService.determineNextAttendanceType(employee.id());
+            AttendanceLog attendance = attendanceService.recordAttendance(employee.id(), nextType, snapshotPath, cameraId);
             return new RecognitionEvent(
                     employee.id(),
                     employee.employeeCode(),

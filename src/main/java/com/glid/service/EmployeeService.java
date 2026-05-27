@@ -66,6 +66,12 @@ public class EmployeeService {
         return store.findEmployeeById(employeeId);
     }
 
+    public java.util.Optional<Employee> findByCode(String employeeCode) {
+        return store.findAllEmployees().stream()
+                .filter(emp -> emp.employeeCode().equals(employeeCode))
+                .findFirst();
+    }
+
     public List<FaceEmbedding> findEmbeddings(long employeeId) {
         return store.findEmbeddings(employeeId);
     }

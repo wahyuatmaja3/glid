@@ -210,6 +210,27 @@ public final class AppDataStore {
         }
     }
 
+    public AttendanceType findLatestAttendanceType(long employeeId) {
+        String sql = """
+                SELECT attendance_type
+                FROM attendance_logs
+                WHERE employee_id = ?
+                ORDER BY timestamp DESC
+                LIMIT 1
+                """;
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, employeeId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return AttendanceType.valueOf(resultSet.getString("attendance_type"));
+                }
+                return null;
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to load latest attendance type", exception);
+        }
+    }
+
     private void initializeDatabase() {
         try {
             Files.createDirectories(Path.of("data"));

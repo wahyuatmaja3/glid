@@ -36,6 +36,14 @@ public class AttendanceService {
         return store.saveAttendance(employee.id(), employee.employeeCode(), employee.fullName(), type, imagePath, cameraId);
     }
 
+    public AttendanceType determineNextAttendanceType(long employeeId) {
+        AttendanceType lastType = store.findLatestAttendanceType(employeeId);
+        if (lastType == null) {
+            return AttendanceType.CHECK_IN;
+        }
+        return lastType == AttendanceType.CHECK_IN ? AttendanceType.CHECK_OUT : AttendanceType.CHECK_IN;
+    }
+
     public List<AttendanceLog> history() {
         return store.findAttendanceLogs();
     }

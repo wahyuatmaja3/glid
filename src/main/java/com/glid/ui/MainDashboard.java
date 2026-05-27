@@ -223,6 +223,24 @@ public class MainDashboard {
             refreshReportTable(from, to, dept.isEmpty() ? null : dept, empCode.isEmpty() ? null : empCode);
         });
         
+        Button exportCsvButton = new Button("Export CSV");
+        exportCsvButton.setOnAction(event -> {
+            LocalDate from = fromDatePicker.getValue();
+            LocalDate to = toDatePicker.getValue();
+            String dept = departmentFilter.getText().trim();
+            String empCode = employeeCodeFilter.getText().trim();
+            exportCsvReport(from, to, dept.isEmpty() ? null : dept, empCode.isEmpty() ? null : empCode);
+        });
+        
+        Button exportPdfButton = new Button("Export PDF");
+        exportPdfButton.setOnAction(event -> {
+            LocalDate from = fromDatePicker.getValue();
+            LocalDate to = toDatePicker.getValue();
+            String dept = departmentFilter.getText().trim();
+            String empCode = employeeCodeFilter.getText().trim();
+            exportPdfReport(from, to, dept.isEmpty() ? null : dept, empCode.isEmpty() ? null : empCode);
+        });
+        
         Button closeButton = new Button("Close (F3)");
         closeButton.setOnAction(event -> setVisibleManaged(reportOverlay, false));
         
@@ -232,11 +250,14 @@ public class MainDashboard {
                                 departmentFilter, employeeCodeFilter, filterButton);
         filters.setAlignment(Pos.CENTER_LEFT);
         
+        HBox exportButtons = new HBox(8, exportCsvButton, exportPdfButton);
+        exportButtons.setAlignment(Pos.CENTER_LEFT);
+        
         HBox header = new HBox(20, reportTitle, closeButton);
         header.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(reportTitle, Priority.ALWAYS);
         
-        VBox panel = new VBox(12, header, filters, reportTable);
+        VBox panel = new VBox(12, header, filters, exportButtons, reportTable);
         panel.setMaxWidth(1000);
         panel.setMaxHeight(700);
         panel.setPadding(new Insets(20));
@@ -502,6 +523,51 @@ public class MainDashboard {
         timestamp.setPrefWidth(150);
         reportTable.getColumns().setAll(id, employeeCode, employeeName, type, timestamp);
         reportTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+    }
+
+    private void exportCsvReport(LocalDate from, LocalDate to, String department, String employeeCode) {
+        try {
+            String fileName = "attendance_report_" + from + "_to_" + to + ".csv";
+            String filePath = "reports/" + fileName;
+            new File("reports").mkdirs();
+            
+            String csvContent = context.reportService().exportCsvPreview(from, to, department, employeeCode);
+            java.nio.file.Files.writeString(java.nio.file.Path.of(filePath), csvContent);
+            
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
+            alert.setTitle("Export Success");
+            alert.setHeaderText("CSV exported successfully");
+            alert.setContentText("File saved to: " + filePath);
+            alert.showAndWait();
+        } catch (Exception e) {
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR);
+            alert.setTitle("Export Failed");
+            alert.setHeaderText("Failed to export CSV");
+            alert.setContentText(e.getMessage());
+            alert.showAndWait();
+        }
+    }
+    
+    private void exportPdfReport(LocalDate from, LocalDate to, String department, String employeeCode) {
+        try {
+            String fileName = "attendance_report_" + from + "_to_" + to + ".pdf";
+            String filePath = "reports/" + fileName;
+            new File("reports").mkdirs();
+            
+            context.reportService().exportPdf(filePath, from, to, department, employeeCode);
+            
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
+            alert.setTitle("Export Success");
+            alert.setHeaderText("PDF exported successfully");
+            alert.setContentText("File saved to: " + filePath);
+            alert.showAndWait();
+        } catch (Exception e) {
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR);
+            alert.setTitle("Export Failed");
+            alert.setHeaderText("Failed to export PDF");
+            alert.setContentText(e.getMessage());
+            alert.showAndWait();
+        }
     }
 
     public record AttendanceRow(long id, String employeeCode, String employeeName, String attendanceType, String timestamp, String cameraId, String imagePath) {}
