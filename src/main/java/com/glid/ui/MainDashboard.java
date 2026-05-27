@@ -5,30 +5,32 @@ import com.glid.model.DetectionArtifact;
 import com.glid.model.DetectionFrame;
 import com.glid.model.Employee;
 import com.glid.model.RecognitionEvent;
+import javafx.animation.PauseTransition;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.application.Platform;
 import javafx.scene.Parent;
 import javafx.scene.Node;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyEvent;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
-import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableCell;
+import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
-import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.util.Duration;
 
 import java.io.File;
 import java.time.LocalDate;
@@ -58,10 +60,15 @@ public class MainDashboard {
     private final Label registerMessageLabel = new Label("");
     private VBox quickRegisterPanel;
     private HBox cameraControls;
+    private TextField overlayCameraIndexField;
     private StackPane registerOverlay;
     private StackPane reportOverlay;
     private VBox reportPanel;
     private DetectionArtifact capturedArtifact;
+
+    // overlay for attendance info
+    private final Label attendanceOverlayLabel = new Label();
+    private final PauseTransition attendanceOverlayTimer = new PauseTransition(Duration.seconds(10));
 
     public MainDashboard(AppContext context) { this.context = context; }
 
@@ -78,18 +85,22 @@ public class MainDashboard {
                 event.consume();
             }
         });
-        root.sceneProperty().addListener((observable, oldScene, newScene) -> {
+        root.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) {
-                newScene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
-                    if (event.getCode() == KeyCode.F1 || event.getCode() == KeyCode.F2 || event.getCode() == KeyCode.F3 || event.getCode() == KeyCode.F4) {
-                        handleHotkey(event.getCode());
-                        event.consume();
+                newScene.addEventFilter(KeyEvent.KEY_PRESSED, ev -> {
+                    if (ev.getCode() == KeyCode.F1 || ev.getCode() == KeyCode.F2 || ev.getCode() == KeyCode.F3 || ev.getCode() == KeyCode.F4) {
+                        handleHotkey(ev.getCode());
+                        ev.consume();
                     }
                 });
             }
         });
         Platform.runLater(root::requestFocus);
         refreshAttendance();
+        attendanceOverlayTimer.setOnFinished(e -> {
+            attendanceOverlayLabel.setVisible(false);
+            attendanceOverlayLabel.setManaged(false);
+        });
         return root;
     }
 
@@ -97,169 +108,200 @@ public class MainDashboard {
         quickRegisterPanel = buildQuickRegisterPanel();
         reportPanel = buildReportPanel();
         VBox scanPanel = buildScanPanel();
-
         registerOverlay = buildOverlay(quickRegisterPanel, Pos.TOP_CENTER);
         reportOverlay = buildOverlay(reportPanel, Pos.CENTER);
         setVisibleManaged(registerOverlay, false);
         setVisibleManaged(reportOverlay, false);
-
         return new StackPane(scanPanel, registerOverlay, reportOverlay);
     }
 
     private StackPane buildOverlay(Node content, Pos align) {
         StackPane holder = new StackPane(content);
         holder.setPickOnBounds(true);
-        holder.setStyle("-fx-background-color: rgba(0, 0, 0, 0.5);");
+        holder.getStyleClass().add("app-overlay");
         StackPane.setAlignment(content, align);
-        content.setStyle("-fx-background-color: white; -fx-padding: 20; -fx-border-color: #cccccc; -fx-border-width: 2;");
+        content.getStyleClass().add("overlay-card");
         return holder;
     }
 
     private VBox buildQuickRegisterPanel() {
         employeeCodeField.setPromptText("Code");
         fullNameField.setPromptText("Name");
-        departmentField.setPromptText("Dept");
+        departmentField.setPromptText("Department");
         positionField.setPromptText("Position");
         activeCheckBox.setSelected(true);
-        activeCheckBox.setStyle("-fx-text-fill: black; -fx-font-size: 14px;");
-        maskCheckBox.setStyle("-fx-text-fill: black; -fx-font-size: 14px;");
-
+        employeeCodeField.getStyleClass().add("editorial-input");
+        fullNameField.getStyleClass().add("editorial-input");
+        departmentField.getStyleClass().add("editorial-input");
+        positionField.getStyleClass().add("editorial-input");
+        registerFaceStatusLabel.getStyleClass().add("helper-label");
+        registerMessageLabel.getStyleClass().add("error-label");
         Button captureFaceButton = new Button("Capture");
-        captureFaceButton.setOnAction(event -> captureFaceSampleForRegistration());
+        captureFaceButton.getStyleClass().add("button-secondary");
+        captureFaceButton.setOnAction(e -> captureFaceSampleForRegistration());
         Button registerButton = new Button("Register");
-        registerButton.setOnAction(event -> handleRegisterEmployee());
+        registerButton.getStyleClass().add("button-dark");
+        registerButton.setOnAction(e -> handleRegisterEmployee());
         Button closeButton = new Button("Close (F1)");
-        closeButton.setOnAction(event -> setVisibleManaged(registerOverlay, false));
-
-        registerMessageLabel.setStyle("-fx-text-fill: #d9534f; -fx-font-size: 13px;");
-
-        HBox row1 = new HBox(8, employeeCodeField, fullNameField, departmentField, positionField);
-        HBox row2 = new HBox(8, activeCheckBox, maskCheckBox, captureFaceButton, registerButton, registerFaceStatusLabel);
-        HBox row3 = new HBox(8, closeButton);
+        closeButton.getStyleClass().add("button-cream");
+        closeButton.setOnAction(e -> setVisibleManaged(registerOverlay, false));
+        HBox row1 = new HBox(12, employeeCodeField, fullNameField, departmentField, positionField);
+        HBox row2 = new HBox(12, activeCheckBox, maskCheckBox, captureFaceButton, registerButton);
+        HBox row3 = new HBox(12, registerFaceStatusLabel, closeButton);
         row3.setAlignment(Pos.CENTER_RIGHT);
-
-        VBox panel = new VBox(12, row1, row2, registerMessageLabel, row3);
-        panel.setMaxWidth(900);
+        HBox.setHgrow(registerFaceStatusLabel, Priority.ALWAYS);
+        VBox panel = new VBox(16, row1, row2, registerMessageLabel, row3);
+        panel.getStyleClass().add("register-panel");
+        panel.setMaxWidth(980);
         panel.setPadding(new Insets(0));
         return panel;
     }
 
     private VBox buildScanPanel() {
         cameraIndexField.setPrefWidth(56);
-        autoAttendanceCheckBox.setOnAction(event -> context.autoAttendanceService().setAutoModeEnabled(autoAttendanceCheckBox.isSelected()));
-        autoAttendanceCheckBox.setStyle("-fx-text-fill: white; -fx-font-size: 14px;");
-
+        cameraIndexField.getStyleClass().add("editorial-input");
+        overlayCameraIndexField = new TextField(cameraIndexField.getText());
+        overlayCameraIndexField.setPrefWidth(56);
+        overlayCameraIndexField.getStyleClass().add("editorial-input");
+        autoAttendanceCheckBox.setOnAction(e -> context.autoAttendanceService().setAutoModeEnabled(autoAttendanceCheckBox.isSelected()));
         Button startCamera = new Button("Start Camera");
-        startCamera.setOnAction(event -> startCamera());
+        startCamera.getStyleClass().add("button-dark");
+        startCamera.setOnAction(e -> startCamera());
         Button stopCamera = new Button("Stop Camera");
-        stopCamera.setOnAction(event -> stopCamera());
-
-        HBox topControls = new HBox(10, new Label("Camera:"), cameraIndexField, startCamera, stopCamera, autoAttendanceCheckBox);
+        stopCamera.getStyleClass().add("button-cream");
+        stopCamera.setOnAction(e -> stopCamera());
+        Button overlayStartCamera = new Button("Start");
+        overlayStartCamera.getStyleClass().add("button-dark");
+        overlayStartCamera.setOnAction(e -> startCamera());
+        Button overlayStopCamera = new Button("Stop");
+        overlayStopCamera.getStyleClass().add("button-cream");
+        overlayStopCamera.setOnAction(e -> stopCamera());
+        CheckBox overlayAutoAttendanceCheckBox = new CheckBox("Auto");
+        overlayAutoAttendanceCheckBox.setSelected(autoAttendanceCheckBox.isSelected());
+        overlayAutoAttendanceCheckBox.setOnAction(ev -> {
+            autoAttendanceCheckBox.setSelected(overlayAutoAttendanceCheckBox.isSelected());
+            context.autoAttendanceService().setAutoModeEnabled(overlayAutoAttendanceCheckBox.isSelected());
+        });
+        autoAttendanceCheckBox.selectedProperty().addListener((obs, oldV, newV) -> overlayAutoAttendanceCheckBox.setSelected(newV));
+        cameraIndexField.textProperty().addListener((obs, oldV, newV) -> overlayCameraIndexField.setText(newV));
+        overlayCameraIndexField.textProperty().addListener((obs, oldV, newV) -> {
+            if (!cameraIndexField.getText().equals(newV)) {
+                cameraIndexField.setText(newV);
+            }
+        });
+        Label cameraLabel = new Label("Camera");
+        cameraLabel.getStyleClass().add("field-label");
+        HBox topControls = new HBox(12, cameraLabel, cameraIndexField, startCamera, stopCamera, autoAttendanceCheckBox);
+        topControls.getStyleClass().add("top-toolbar");
         topControls.setAlignment(Pos.CENTER_LEFT);
-        topControls.setPadding(new Insets(10));
-        topControls.setStyle("-fx-background-color: #2c3e50; -fx-border-color: #34495e; -fx-border-width: 0 0 2 0;");
-
-        cameraControls = new HBox(6, cameraIndexField, startCamera, stopCamera, autoAttendanceCheckBox);
+        topControls.setVisible(false);
+        topControls.setManaged(false);
+        cameraControls = new HBox(8, overlayCameraIndexField, overlayStartCamera, overlayStopCamera, overlayAutoAttendanceCheckBox);
         cameraControls.getStyleClass().addAll("toolbar-row", "camera-overlay-controls");
         cameraControls.setAlignment(Pos.CENTER_LEFT);
-        cameraControls.setPadding(new Insets(10));
         setVisibleManaged(cameraControls, false);
-
         configureAttendanceTable();
-        cameraPreview.setPreserveRatio(false);
-
-        StackPane cameraArea = new StackPane(cameraPreview, cameraControls);
-        cameraArea.setStyle("-fx-background-color: #34495e;");
+        cameraPreview.setPreserveRatio(true);
+        cameraPreview.setSmooth(true);
+        VBox recognitionCard = new VBox(8,
+                buildRecognitionMetric("Camera Status", cameraStatusLabel),
+                buildRecognitionMetric("Detection", detectionStatusLabel),
+                buildRecognitionMetric("Evidence", evidenceStatusLabel),
+                buildRecognitionMetric("Employee", evidenceEmployeeLabel));
+        recognitionCard.getStyleClass().add("recognition-card");
+        recognitionCard.setMaxWidth(320);
+        recognitionCard.setVisible(false);
+        recognitionCard.setManaged(false);
+        StackPane cameraStage = new StackPane(cameraPreview);
+        cameraStage.getStyleClass().add("camera-stage-modern");
+        attendanceOverlayLabel.getStyleClass().add("attendance-overlay-label");
+        attendanceOverlayLabel.setVisible(false);
+        attendanceOverlayLabel.setManaged(false);
+        StackPane cameraArea = new StackPane(cameraStage, cameraControls, recognitionCard, attendanceOverlayLabel);
+        cameraArea.getStyleClass().add("camera-shell");
+        cameraArea.setMinWidth(0);
+        cameraArea.setMaxWidth(Double.MAX_VALUE);
+        cameraArea.setMinHeight(0);
+        cameraArea.setMaxHeight(Double.MAX_VALUE);
         StackPane.setAlignment(cameraControls, Pos.TOP_LEFT);
-
+        StackPane.setAlignment(recognitionCard, Pos.BOTTOM_LEFT);
+        StackPane.setAlignment(attendanceOverlayLabel, Pos.TOP_LEFT);
+        StackPane.setMargin(recognitionCard, new Insets(0, 0, 20, 20));
+        StackPane.setMargin(attendanceOverlayLabel, new Insets(20, 0, 0, 20));
         Label attendanceTitle = new Label("Recent Attendance");
-        attendanceTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: white; -fx-padding: 10;");
+        attendanceTitle.getStyleClass().add("panel-heading");
         attendanceTitle.setMaxWidth(Double.MAX_VALUE);
-        attendanceTitle.setStyle("-fx-background-color: #2c3e50; -fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: white; -fx-padding: 10;");
-
         VBox right = new VBox(0, attendanceTitle, attendanceTable);
-        right.setStyle("-fx-background-color: white;");
+        right.getStyleClass().add("side-panel");
         VBox.setVgrow(attendanceTable, Priority.ALWAYS);
-        
-        HBox main = new HBox(0, cameraArea, right);
+        right.setVisible(false);
+        right.setManaged(false);
+        HBox main = new HBox(24, cameraArea, right);
+        main.getStyleClass().add("content-shell");
+        main.setFillHeight(true);
         HBox.setHgrow(cameraArea, Priority.ALWAYS);
         HBox.setHgrow(right, Priority.NEVER);
-        cameraArea.prefWidthProperty().bind(main.widthProperty().multiply(0.65));
-        right.prefWidthProperty().bind(main.widthProperty().multiply(0.35));
-
+        // camera area occupies full width when right panel hidden
+        cameraArea.prefWidthProperty().bind(main.widthProperty());
         cameraPreview.fitWidthProperty().bind(cameraArea.widthProperty());
         cameraPreview.fitHeightProperty().bind(cameraArea.heightProperty());
-
-        VBox panel = new VBox(0, topControls, main);
-        panel.setPadding(new Insets(0));
+        VBox panel = new VBox(18, topControls, main, buildSunsetStripe());
+        panel.getStyleClass().add("dashboard-shell");
+        panel.setFillWidth(true);
         VBox.setVgrow(main, Priority.ALWAYS);
         return panel;
     }
 
     private VBox buildReportPanel() {
         Label reportTitle = new Label("Attendance Report");
-        reportTitle.setStyle("-fx-font-size: 18px; -fx-text-fill: black; -fx-font-weight: bold;");
-        
+        reportTitle.getStyleClass().add("modal-title");
         javafx.scene.control.DatePicker fromDatePicker = new javafx.scene.control.DatePicker();
         fromDatePicker.setPromptText("From Date");
         fromDatePicker.setValue(LocalDate.now().minusDays(7));
-        
         javafx.scene.control.DatePicker toDatePicker = new javafx.scene.control.DatePicker();
         toDatePicker.setPromptText("To Date");
         toDatePicker.setValue(LocalDate.now());
-        
         TextField departmentFilter = new TextField();
         departmentFilter.setPromptText("Department");
-        
         TextField employeeCodeFilter = new TextField();
         employeeCodeFilter.setPromptText("Employee Code");
-        
         Button filterButton = new Button("Filter");
-        filterButton.setOnAction(event -> {
+        filterButton.setOnAction(e -> {
             LocalDate from = fromDatePicker.getValue();
             LocalDate to = toDatePicker.getValue();
             String dept = departmentFilter.getText().trim();
-            String empCode = employeeCodeFilter.getText().trim();
-            refreshReportTable(from, to, dept.isEmpty() ? null : dept, empCode.isEmpty() ? null : empCode);
+            String emp = employeeCodeFilter.getText().trim();
+            refreshReportTable(from, to, dept.isEmpty() ? null : dept, emp.isEmpty() ? null : emp);
         });
-        
         Button exportCsvButton = new Button("Export CSV");
-        exportCsvButton.setOnAction(event -> {
+        exportCsvButton.setOnAction(e -> {
             LocalDate from = fromDatePicker.getValue();
             LocalDate to = toDatePicker.getValue();
             String dept = departmentFilter.getText().trim();
-            String empCode = employeeCodeFilter.getText().trim();
-            exportCsvReport(from, to, dept.isEmpty() ? null : dept, empCode.isEmpty() ? null : empCode);
+            String emp = employeeCodeFilter.getText().trim();
+            exportCsvReport(from, to, dept.isEmpty() ? null : dept, emp.isEmpty() ? null : emp);
         });
-        
         Button exportPdfButton = new Button("Export PDF");
-        exportPdfButton.setOnAction(event -> {
+        exportPdfButton.setOnAction(e -> {
             LocalDate from = fromDatePicker.getValue();
             LocalDate to = toDatePicker.getValue();
             String dept = departmentFilter.getText().trim();
-            String empCode = employeeCodeFilter.getText().trim();
-            exportPdfReport(from, to, dept.isEmpty() ? null : dept, empCode.isEmpty() ? null : empCode);
+            String emp = employeeCodeFilter.getText().trim();
+            exportPdfReport(from, to, dept.isEmpty() ? null : dept, emp.isEmpty() ? null : emp);
         });
-        
         Button closeButton = new Button("Close (F3)");
-        closeButton.setOnAction(event -> setVisibleManaged(reportOverlay, false));
-        
+        closeButton.setOnAction(e -> setVisibleManaged(reportOverlay, false));
         configureReportTable();
-        
-        HBox filters = new HBox(8, new Label("From:"), fromDatePicker, new Label("To:"), toDatePicker, 
-                                departmentFilter, employeeCodeFilter, filterButton);
+        HBox filters = new HBox(8, new Label("From:"), fromDatePicker, new Label("To:"), toDatePicker, departmentFilter, employeeCodeFilter, filterButton);
         filters.setAlignment(Pos.CENTER_LEFT);
-        
         HBox exportButtons = new HBox(8, exportCsvButton, exportPdfButton);
         exportButtons.setAlignment(Pos.CENTER_LEFT);
-        
         HBox header = new HBox(20, reportTitle, closeButton);
         header.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(reportTitle, Priority.ALWAYS);
-        
         VBox panel = new VBox(12, header, filters, exportButtons, reportTable);
-        panel.setMaxWidth(1000);
-        panel.setMaxHeight(700);
+        panel.setMaxWidth(Double.MAX_VALUE);
+        panel.setMaxHeight(Double.MAX_VALUE);
         panel.setPadding(new Insets(20));
         VBox.setVgrow(reportTable, Priority.ALWAYS);
         return panel;
@@ -302,13 +344,13 @@ public class MainDashboard {
             return;
         }
         try {
-            Employee employee = context.employeeService().registerEmployeeWithArtifact(
+            Employee emp = context.employeeService().registerEmployeeWithArtifact(
                     employeeCodeField.getText().trim(), fullNameField.getText().trim(), departmentField.getText().trim(),
                     positionField.getText().trim(), activeCheckBox.isSelected(), maskCheckBox.isSelected(), capturedArtifact);
-            registerMessageLabel.setText("Registered " + employee.fullName());
+            registerMessageLabel.setText("Registered " + emp.fullName());
             capturedArtifact = null;
             refreshRegistrationFaceStatus();
-        } catch (IllegalStateException exception) {
+        } catch (IllegalStateException ex) {
             registerMessageLabel.setText("Registration failed: employee code already exists or data is invalid.");
         }
     }
@@ -334,10 +376,12 @@ public class MainDashboard {
     }
 
     private void startCamera() {
-        int cameraIndex;
-        try { cameraIndex = Integer.parseInt(cameraIndexField.getText().trim()); }
-        catch (NumberFormatException exception) { cameraStatusLabel.setText("Invalid camera index"); return; }
-        context.cameraCaptureService().startCamera(cameraIndex, this::renderDetectionFrame, status -> cameraStatusLabel.setText(status));
+        int idx;
+        try { idx = Integer.parseInt(cameraIndexField.getText().trim()); } catch (NumberFormatException e) { cameraStatusLabel.setText("Invalid camera index"); return; }
+        if (overlayCameraIndexField != null && !overlayCameraIndexField.getText().equals(cameraIndexField.getText())) {
+            overlayCameraIndexField.setText(cameraIndexField.getText());
+        }
+        context.cameraCaptureService().startCamera(idx, this::renderDetectionFrame, status -> cameraStatusLabel.setText(status));
     }
 
     private void stopCamera() { context.cameraCaptureService().stopCamera(); }
@@ -346,142 +390,131 @@ public class MainDashboard {
         javafx.stage.Stage dialog = new javafx.stage.Stage();
         dialog.setTitle("Select Camera");
         dialog.initModality(javafx.stage.Modality.APPLICATION_MODAL);
-
-        ListView<String> cameraListView = new ListView<>();
-        cameraListView.setPrefHeight(200);
-        
-        Label statusLabel = new Label("Scanning for cameras...");
-        Button refreshButton = new Button("Refresh");
-        Button selectButton = new Button("Select");
-        Button cancelButton = new Button("Cancel");
-
-        refreshButton.setOnAction(event -> {
-            statusLabel.setText("Scanning for cameras...");
-            cameraListView.getItems().clear();
+        ListView<String> list = new ListView<>();
+        list.setPrefHeight(200);
+        Label status = new Label("Scanning for cameras...");
+        Button refresh = new Button("Refresh");
+        Button select = new Button("Select");
+        Button cancel = new Button("Cancel");
+        refresh.setOnAction(ev -> {
+            status.setText("Scanning for cameras...");
+            list.getItems().clear();
             new Thread(() -> {
-                var cameras = scanAvailableCameras();
+                var cams = scanAvailableCameras();
                 Platform.runLater(() -> {
-                    cameraListView.setItems(FXCollections.observableArrayList(cameras));
-                    statusLabel.setText("Found " + cameras.size() + " camera(s)");
+                    list.setItems(FXCollections.observableArrayList(cams));
+                    status.setText("Found " + cams.size() + " camera(s)");
                 });
             }).start();
         });
-
-        selectButton.setOnAction(event -> {
-            String selected = cameraListView.getSelectionModel().getSelectedItem();
-            if (selected != null) {
-                String index = selected.split(":")[0].replace("Camera ", "");
+        select.setOnAction(ev -> {
+            String sel = list.getSelectionModel().getSelectedItem();
+            if (sel != null) {
+                String index = sel.split(":")[0].replace("Camera ", "");
                 cameraIndexField.setText(index);
                 dialog.close();
             }
         });
-
-        cancelButton.setOnAction(event -> dialog.close());
-
-        HBox buttons = new HBox(8, refreshButton, selectButton, cancelButton);
-        buttons.setAlignment(Pos.CENTER_RIGHT);
-        
-        VBox layout = new VBox(12, statusLabel, cameraListView, buttons);
+        cancel.setOnAction(ev -> dialog.close());
+        HBox btns = new HBox(8, refresh, select, cancel);
+        btns.setAlignment(Pos.CENTER_RIGHT);
+        VBox layout = new VBox(12, status, list, btns);
         layout.setPadding(new Insets(15));
         layout.setStyle("-fx-background-color: white;");
-        
-        javafx.scene.Scene scene = new javafx.scene.Scene(layout, 400, 300);
-        dialog.setScene(scene);
-        
-        refreshButton.fire();
+        dialog.setScene(new javafx.scene.Scene(layout, 400, 300));
+        refresh.fire();
         dialog.showAndWait();
     }
 
     private java.util.List<String> scanAvailableCameras() {
-        java.util.List<String> cameras = new java.util.ArrayList<>();
+        java.util.List<String> cams = new java.util.ArrayList<>();
         for (int i = 0; i < 10; i++) {
-            org.opencv.videoio.VideoCapture testCapture = new org.opencv.videoio.VideoCapture(i);
-            if (testCapture.isOpened()) {
-                cameras.add("Camera " + i + ": Available");
-                testCapture.release();
-            }
+            org.opencv.videoio.VideoCapture cap = new org.opencv.videoio.VideoCapture(i);
+            if (cap.isOpened()) { cams.add("Camera " + i + ": Available"); cap.release(); }
         }
-        return cameras;
+        return cams;
     }
 
     private void renderDetectionFrame(DetectionFrame frame) {
         cameraPreview.setImage(frame.image());
-
+        detectionStatusLabel.setText("Faces detected: " + frame.faceCount());
         if (autoAttendanceCheckBox.isSelected()) {
-            RecognitionEvent autoEvent = context.autoAttendanceService().tryAutoAttendance("CAM-01", false);
-            if (autoEvent != null) {
-                context.cameraCaptureService().setFaceOverlayName(autoEvent.employeeName());
+            RecognitionEvent ev = context.autoAttendanceService().tryAutoAttendance("CAM-01", false);
+            if (ev != null) {
+                context.cameraCaptureService().setFaceOverlayName(ev.employeeName());
+                showAttendanceOverlay(ev.employeeName(), ev.recognizedAt().format(TIMESTAMP_FORMAT));
                 refreshAttendance();
-                System.out.println("[UI] Auto attendance: " + autoEvent.employeeName() + " - " + autoEvent.status());
+                System.out.println("[UI] Auto attendance: " + ev.employeeName() + " - " + ev.status());
             }
         }
     }
 
+    private void showAttendanceOverlay(String employeeName, String timestamp) {
+        attendanceOverlayLabel.setText(employeeName + "\n" + timestamp);
+        attendanceOverlayLabel.setVisible(true);
+        attendanceOverlayLabel.setManaged(true);
+        attendanceOverlayTimer.playFromStart();
+    }
+
     private void refreshAttendance() {
         var rows = FXCollections.observableArrayList(
-                context.attendanceService().history().stream().map(log -> new AttendanceRow(
-                        log.id(), log.employeeCode(), log.employeeName(), log.attendanceType().name(),
-                        log.timestamp().format(TIMESTAMP_FORMAT), log.cameraId(), log.imagePath())).toList());
+                context.attendanceService().history().stream()
+                        .map(l -> new AttendanceRow(l.id(), l.employeeCode(), l.employeeName(), l.attendanceType().name(), l.timestamp().format(TIMESTAMP_FORMAT), l.cameraId(), l.imagePath()))
+                .toList());
         attendanceTable.setItems(rows);
     }
 
-    private void refreshReportTable(LocalDate from, LocalDate to, String department, String employeeCode) {
+    private void refreshReportTable(LocalDate from, LocalDate to, String dept, String emp) {
         var rows = FXCollections.observableArrayList(
-                context.attendanceService().filteredHistory(from, to, department, employeeCode).stream()
-                        .map(log -> new AttendanceRow(
-                                log.id(), log.employeeCode(), log.employeeName(), log.attendanceType().name(),
-                                log.timestamp().format(TIMESTAMP_FORMAT), log.cameraId(), log.imagePath())).toList());
+                context.attendanceService().filteredHistory(from, to, dept, emp).stream()
+                        .map(l -> new AttendanceRow(l.id(), l.employeeCode(), l.employeeName(), l.attendanceType().name(), l.timestamp().format(TIMESTAMP_FORMAT), l.cameraId(), l.imagePath()))
+                .toList());
         reportTable.setItems(rows);
     }
 
     private void configureAttendanceTable() {
         TableColumn<AttendanceRow, String> photo = new TableColumn<>("Photo");
-        photo.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().imagePath()));
+        photo.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(c.getValue().imagePath()));
         photo.setPrefWidth(80);
-        photo.setMaxWidth(80);
-        photo.setMinWidth(80);
         photo.setCellFactory(col -> new TableCell<>() {
             private final ImageView thumb = new ImageView();
             @Override protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null || item.isBlank()) { setGraphic(null); return; }
-                File file = new File(item);
-                if (!file.exists()) { setGraphic(null); return; }
-                thumb.setImage(new Image(file.toURI().toString(), 64, 64, true, true));
+                File f = new File(item);
+                if (!f.exists()) { setGraphic(null); return; }
+                thumb.setImage(new Image(f.toURI().toString(), 64, 64, true, true));
                 setGraphic(thumb);
             }
         });
         TableColumn<AttendanceRow, String> code = new TableColumn<>("Code");
-        code.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().employeeCode()));
+        code.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(c.getValue().employeeCode()));
         code.setPrefWidth(100);
-        TableColumn<AttendanceRow, String> employeeName = new TableColumn<>("Name");
-        employeeName.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().employeeName()));
-        employeeName.setPrefWidth(150);
+        TableColumn<AttendanceRow, String> name = new TableColumn<>("Name");
+        name.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(c.getValue().employeeName()));
+        name.setPrefWidth(150);
         TableColumn<AttendanceRow, String> type = new TableColumn<>("Type");
-        type.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().attendanceType()));
+        type.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(c.getValue().attendanceType()));
         type.setPrefWidth(100);
-        TableColumn<AttendanceRow, String> timestamp = new TableColumn<>("Time");
-        timestamp.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().timestamp()));
-        timestamp.setPrefWidth(150);
-        
-        TableColumn<AttendanceRow, Void> actionCol = new TableColumn<>("Action");
-        actionCol.setPrefWidth(80);
-        actionCol.setMaxWidth(80);
-        actionCol.setMinWidth(80);
-        actionCol.setCellFactory(col -> new TableCell<>() {
-            private final Button deleteBtn = new Button("Delete");
+        TableColumn<AttendanceRow, String> time = new TableColumn<>("Time");
+        time.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(c.getValue().timestamp()));
+        time.setPrefWidth(150);
+        TableColumn<AttendanceRow, Void> action = new TableColumn<>("Action");
+        action.setPrefWidth(80);
+        action.setCellFactory(col -> new TableCell<>() {
+            private final Button del = new Button("Delete");
             {
-                deleteBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 4 8 4 8;");
-                deleteBtn.setOnAction(event -> {
-                    AttendanceRow row = getTableView().getItems().get(getIndex());
-                    if (row != null) {
-                        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.CONFIRMATION);
-                        alert.setTitle("Delete Attendance");
-                        alert.setHeaderText("Delete attendance record?");
-                        alert.setContentText("Employee: " + row.employeeName() + "\nTime: " + row.timestamp());
-                        alert.showAndWait().ifPresent(response -> {
-                            if (response == javafx.scene.control.ButtonType.OK) {
-                                context.attendanceService().delete(row.id());
+                del.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 4 8 4 8;");
+                del.setOnAction(e -> {
+                    AttendanceRow r = getTableView().getItems().get(getIndex());
+                    if (r != null) {
+                        javafx.scene.control.Alert a = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.CONFIRMATION);
+                        a.setTitle("Delete Attendance");
+                        a.setHeaderText("Delete attendance record?");
+                        a.setContentText("Employee: " + r.employeeName() + "\nTime: " + r.timestamp());
+                        a.showAndWait().ifPresent(btn -> {
+                            if (btn == javafx.scene.control.ButtonType.OK) {
+                                context.attendanceService().delete(r.id());
                                 refreshAttendance();
                             }
                         });
@@ -490,85 +523,89 @@ public class MainDashboard {
             }
             @Override protected void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty) {
-                    setGraphic(null);
-                } else {
-                    setGraphic(deleteBtn);
-                }
+                setGraphic(empty ? null : del);
             }
         });
-        
-        attendanceTable.getColumns().setAll(photo, code, employeeName, type, timestamp, actionCol);
+        attendanceTable.getColumns().setAll(photo, code, name, type, time, action);
         attendanceTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_SUBSEQUENT_COLUMNS);
     }
 
     private void configureReportTable() {
-        if (!reportTable.getColumns().isEmpty()) {
-            return;
-        }
+        if (!reportTable.getColumns().isEmpty()) return;
+        reportTable.getStyleClass().add("editorial-table");
         TableColumn<AttendanceRow, Long> id = new TableColumn<>("ID");
-        id.setCellValueFactory(cellData -> new javafx.beans.property.SimpleLongProperty(cellData.getValue().id()).asObject());
+        id.setCellValueFactory(c -> new javafx.beans.property.SimpleLongProperty(c.getValue().id()).asObject());
         id.setPrefWidth(60);
-        TableColumn<AttendanceRow, String> employeeCode = new TableColumn<>("Code");
-        employeeCode.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().employeeCode()));
-        employeeCode.setPrefWidth(100);
-        TableColumn<AttendanceRow, String> employeeName = new TableColumn<>("Name");
-        employeeName.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().employeeName()));
-        employeeName.setPrefWidth(150);
+        TableColumn<AttendanceRow, String> code = new TableColumn<>("Code");
+        code.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(c.getValue().employeeCode()));
+        code.setPrefWidth(100);
+        TableColumn<AttendanceRow, String> name = new TableColumn<>("Name");
+        name.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(c.getValue().employeeName()));
+        name.setPrefWidth(150);
         TableColumn<AttendanceRow, String> type = new TableColumn<>("Type");
-        type.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().attendanceType()));
+        type.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(c.getValue().attendanceType()));
         type.setPrefWidth(100);
-        TableColumn<AttendanceRow, String> timestamp = new TableColumn<>("Timestamp");
-        timestamp.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().timestamp()));
-        timestamp.setPrefWidth(150);
-        reportTable.getColumns().setAll(id, employeeCode, employeeName, type, timestamp);
+        TableColumn<AttendanceRow, String> ts = new TableColumn<>("Timestamp");
+        ts.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(c.getValue().timestamp()));
+        ts.setPrefWidth(150);
+        reportTable.getColumns().setAll(id, code, name, type, ts);
         reportTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
     }
 
-    private void exportCsvReport(LocalDate from, LocalDate to, String department, String employeeCode) {
+    private void exportCsvReport(LocalDate from, LocalDate to, String dept, String emp) {
         try {
             String fileName = "attendance_report_" + from + "_to_" + to + ".csv";
             String filePath = "reports/" + fileName;
             new File("reports").mkdirs();
-            
-            String csvContent = context.reportService().exportCsvPreview(from, to, department, employeeCode);
-            java.nio.file.Files.writeString(java.nio.file.Path.of(filePath), csvContent);
-            
-            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
-            alert.setTitle("Export Success");
-            alert.setHeaderText("CSV exported successfully");
-            alert.setContentText("File saved to: " + filePath);
-            alert.showAndWait();
-        } catch (Exception e) {
-            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR);
-            alert.setTitle("Export Failed");
-            alert.setHeaderText("Failed to export CSV");
-            alert.setContentText(e.getMessage());
-            alert.showAndWait();
-        }
+            String csv = context.reportService().exportCsvPreview(from, to, dept, emp);
+            java.nio.file.Files.writeString(java.nio.file.Path.of(filePath), csv);
+            javafx.scene.control.Alert a = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
+            a.setTitle("Export Success");
+            a.setHeaderText("CSV exported successfully");
+            a.setContentText("File saved to: " + filePath);
+            a.showAndWait();
+        } catch (Exception e) { showErrorAlert("Export CSV", e.getMessage()); }
     }
-    
-    private void exportPdfReport(LocalDate from, LocalDate to, String department, String employeeCode) {
+
+    private void exportPdfReport(LocalDate from, LocalDate to, String dept, String emp) {
         try {
             String fileName = "attendance_report_" + from + "_to_" + to + ".pdf";
             String filePath = "reports/" + fileName;
             new File("reports").mkdirs();
-            
-            context.reportService().exportPdf(filePath, from, to, department, employeeCode);
-            
-            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
-            alert.setTitle("Export Success");
-            alert.setHeaderText("PDF exported successfully");
-            alert.setContentText("File saved to: " + filePath);
-            alert.showAndWait();
-        } catch (Exception e) {
-            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR);
-            alert.setTitle("Export Failed");
-            alert.setHeaderText("Failed to export PDF");
-            alert.setContentText(e.getMessage());
-            alert.showAndWait();
-        }
+            context.reportService().exportPdf(filePath, from, to, dept, emp);
+            javafx.scene.control.Alert a = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.INFORMATION);
+            a.setTitle("Export Success");
+            a.setHeaderText("PDF exported successfully");
+            a.setContentText("File saved to: " + filePath);
+            a.showAndWait();
+        } catch (Exception e) { showErrorAlert("Export PDF", e.getMessage()); }
+    }
+
+    private void showErrorAlert(String title, String msg) {
+        javafx.scene.control.Alert a = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.ERROR);
+        a.setTitle(title);
+        a.setHeaderText("Failed");
+        a.setContentText(msg);
+        a.showAndWait();
+    }
+
+    private VBox buildRecognitionMetric(String title, Label val) {
+        Label t = new Label(title);
+        t.getStyleClass().add("recognition-label");
+        val.getStyleClass().add("recognition-value");
+        VBox box = new VBox(2, t, val);
+        box.getStyleClass().add("recognition-metric");
+        return box;
+    }
+
+    private Region buildSunsetStripe() {
+        Region r = new Region();
+        r.getStyleClass().add("sunset-stripe");
+        r.setPrefHeight(18);
+        r.setMinHeight(18);
+        return r;
     }
 
     public record AttendanceRow(long id, String employeeCode, String employeeName, String attendanceType, String timestamp, String cameraId, String imagePath) {}
 }
+
